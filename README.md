@@ -2,6 +2,14 @@
 
 MCP Server for the Mattermost API, enabling Claude and other MCP clients to interact with Mattermost workspaces.
 
+
+> **Roselution fork notes (branch `roselution`)**
+> - Config can come from environment variables `MATTERMOST_URL`, `MATTERMOST_TOKEN` and `MATTERMOST_TEAM_ID`. They override `config.json`/`config.local.json`, and when all three are set no config file is needed.
+> - The access token is no longer written to the logs.
+> - The stdin command interface has been removed. It read the same stdin as the MCP stdio transport.
+> - The HTTP control server (`/run-monitoring`, `/status`) is **off by default**. Set `MATTERMOST_MCP_HTTP_PORT=3456` to enable it. It binds to `127.0.0.1` only and sends no CORS headers. A port that's already in use is logged instead of crashing the server.
+> - Dependencies upgraded: `@modelcontextprotocol/sdk` 1.x, `node-cron` 4.x (`npm audit` is clean).
+
 ## Features
 
 This MCP server provides tools for interacting with Mattermost, including:

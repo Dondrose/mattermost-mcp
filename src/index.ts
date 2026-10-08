@@ -126,60 +126,11 @@ async function main() {
     }
   }
   
-  // Set up command-line interface
-  process.stdin.setEncoding('utf8');
-  console.error("Setting up command-line interface...");
-  
-  process.stdin.on('data', async (data) => {
-    console.error(`Received input: "${data.toString().trim()}"`);
-    const input = data.toString().trim().toLowerCase();
-    
-    if (input === 'run' || input === 'monitor' || input === 'check') {
-      console.error("Command received: Running monitoring process...");
-      if (topicMonitor) {
-        try {
-          console.error("Calling topicMonitor.runNow()...");
-          await topicMonitor.runNow();
-          console.error("Monitoring process completed successfully");
-        } catch (error) {
-          console.error("Error running monitoring process:", error);
-        }
-      } else {
-        console.error("Monitoring is not enabled or initialized");
-      }
-    } else if (input === 'help') {
-      console.error("Available commands:");
-      console.error("  run, monitor, check - Run the monitoring process immediately");
-      console.error("  help - Show this help message");
-      console.error("  exit - Shutdown the server");
-    } else if (input === 'exit' || input === 'quit') {
-      console.error("Shutting down server...");
-      process.exit(0);
-    } else {
-      console.error("Unknown command. Type 'help' for available commands");
-    }
-  });
-  
-  // Resume stdin to capture input
-  process.stdin.resume();
-  
-  console.error("Command interface ready. Type 'run' to trigger monitoring, 'help' for more commands");
-  
-  // Set up HTTP server for remote triggering of monitoring
-  const httpPort = 3456; // Choose a port that's likely to be available
+  // Optional HTTP control server for remote triggering of monitoring.
+  // Off unless MATTERMOST_MCP_HTTP_PORT is set; bound to localhost only and unauthenticated,
+  // so never expose it. Several MCP clients can spawn this server, so a busy port is not fatal.
+  const httpPort = Number(process.env.MATTERMOST_MCP_HTTP_PORT || 0);
   const httpServer = http.createServer(async (req, res) => {
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-    
     // Only respond to specific paths
     if (req.url === '/run-monitoring') {
       console.error("Received HTTP request to run monitoring");
@@ -227,8 +178,12 @@ async function main() {
     }
   });
   
+  httpServer.on('error', (error: NodeJS.ErrnoException) => {
+    console.error(`HTTP control server disabled: ${error.code === 'EADDRINUSE' ? `port ${httpPort} is in use` : error.message}`);
+  });
+
   // Start the HTTP server
-  httpServer.listen(httpPort, () => {
+  if (httpPort) httpServer.listen(httpPort, '127.0.0.1', () => {
     console.error(`HTTP server listening on port ${httpPort}`);
     console.error(`To trigger monitoring, visit http://localhost:${httpPort}/run-monitoring`);
     console.error(`To check status, visit http://localhost:${httpPort}/status`);

@@ -23,7 +23,28 @@ export interface Config {
   monitoring?: MonitoringConfig;
 }
 
+// Environment variables (e.g. set by the MCP client's "env" block) take precedence over the
+// config files, so credentials don't have to live on disk next to the build.
+function applyEnvOverrides(config: Partial<Config>): Config {
+  return {
+    ...config,
+    mattermostUrl: process.env.MATTERMOST_URL || config.mattermostUrl || '',
+    token: process.env.MATTERMOST_TOKEN || config.token || '',
+    teamId: process.env.MATTERMOST_TEAM_ID || config.teamId || '',
+  } as Config;
+}
+
 export function loadConfig(): Config {
+  if (process.env.MATTERMOST_URL && process.env.MATTERMOST_TOKEN && process.env.MATTERMOST_TEAM_ID) {
+    const localConfigPath = path.resolve(__dirname, '../config.local.json');
+    const fileConfig = fs.existsSync(localConfigPath)
+      ? (JSON.parse(fs.readFileSync(localConfigPath, 'utf8')) as Partial<Config>)
+      : {};
+    const config = applyEnvOverrides(fileConfig);
+    validateConfig(config);
+    return config;
+  }
+
   try {
     // First try to load from config.local.json
     const localConfigPath = path.resolve(__dirname, '../config.local.json');
@@ -31,7 +52,7 @@ export function loadConfig(): Config {
     // Check if local config exists
     if (fs.existsSync(localConfigPath)) {
       const configData = fs.readFileSync(localConfigPath, 'utf8');
-      const config = JSON.parse(configData) as Config;
+      const config = applyEnvOverrides(JSON.parse(configData) as Partial<Config>);
       
       // Validate required fields
       validateConfig(config);
@@ -41,7 +62,7 @@ export function loadConfig(): Config {
     // Fall back to config.json
     const configPath = path.resolve(__dirname, '../config.json');
     const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData) as Config;
+    const config = applyEnvOverrides(JSON.parse(configData) as Partial<Config>);
     
     // Validate required fields
     validateConfig(config);
